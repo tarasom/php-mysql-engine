@@ -51,6 +51,10 @@ final class ColumnEvaluator
             return $row[$expr->tableName . '.%.' . $expr->columnName];
         }
 
+        if ($expr->columnExpression) {
+            return $expr->columnExpression;
+        }
+
         throw new ProcessorException(
             'Column with index ' . $expr->columnExpression . ' not found in row at offset ' . $expr->start
         );

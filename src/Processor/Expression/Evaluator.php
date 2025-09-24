@@ -96,6 +96,9 @@ class Evaluator
             case \Vimeo\MysqlEngine\Query\Expression\QuestionMarkPlaceholderExpression::class:
                 return QuestionMarkPlaceholderEvaluator::evaluate($scope, $expr);
 
+            case \Vimeo\MysqlEngine\Query\Expression\IntervalOperatorExpression::class:
+                return IntervalEvaluator::evaluate($conn, $scope, $expr, $row, $result);
+
             default:
                 throw new ProcessorException('Unsupported expression ' . get_class($expr));
         }

@@ -221,6 +221,26 @@ final class SelectProcessor extends Processor
         );
     }
 
+    /**
+     * Process nested function expressions recursively
+     * This ensures inner functions are evaluated before outer functions
+     */
+    protected static function evaluateNestedExpression(
+        FakePdoInterface $conn,
+        Scope $scope,
+        $expr,
+        array $row,
+        QueryResult $group_result
+    ) {
+        if ($expr instanceof FunctionExpression) {
+            foreach ($expr->args as $arg) {
+                self::evaluateNestedExpression($conn, $scope, $arg, $row, $group_result);
+            }
+        }
+
+        return Expression\Evaluator::evaluate($conn, $scope, $expr, $row, $group_result);
+    }
+
     protected static function applySelect(
         FakePdoInterface $conn,
         Scope $scope,
@@ -262,7 +282,7 @@ final class SelectProcessor extends Processor
             $formatted_row = [];
 
             foreach ($stmt->selectExpressions as $expr) {
-                $val = Expression\Evaluator::evaluate($conn, $scope, $expr, [], $result);
+                $val = self::evaluateNestedExpression($conn, $scope, $expr, [], $result);
                 $name = $expr->name;
 
                 $formatted_row[$name] = $val;
@@ -325,7 +345,7 @@ final class SelectProcessor extends Processor
                      * should ensure the value of $val is never an array, and only the value of the
                      * column requested, but we'll leave this code just to make sure of that.
                      */
-                    $val = Expression\Evaluator::evaluate($conn, $scope, $expr, $row, $group_result);
+                    $val = self::evaluateNestedExpression($conn, $scope, $expr, $row, $group_result);
                     $name = $expr->name;
 
                     if ($expr instanceof SubqueryExpression && \is_array($val)) {
@@ -375,7 +395,8 @@ final class SelectProcessor extends Processor
 
         if ($i === 0 && $result->grouped_rows !== null) {
             foreach ($stmt->selectExpressions as $expr) {
-                $val = Expression\Evaluator::evaluate($conn, $scope, $expr, [], $result);
+                // Use nested evaluation for complex expressions
+                $val = self::evaluateNestedExpression($conn, $scope, $expr, [], $result);
                 $name = $expr->name;
 
                 if ($expr instanceof SubqueryExpression) {
@@ -423,7 +444,8 @@ final class SelectProcessor extends Processor
                         continue;
                     }
 
-                    $val = Expression\Evaluator::evaluate($conn, $scope, $order_by['expression'], $row, $result);
+                    // Use nested evaluation for complex expressions
+                    $val = self::evaluateNestedExpression($conn, $scope, $order_by['expression'], $row, $result);
                     $out[$i][$name] = $out[$i][$name] ?? $val;
 
                     if ($order_by['expression']->hasAggregate()) {
